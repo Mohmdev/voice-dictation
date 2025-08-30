@@ -1,0 +1,41 @@
+# Whisper models (large files)
+models/*.bin
+models/*.ggml
+models/*.gguf
+
+# Audio recordings
+recordings/*.wav
+recordings/*.mp3
+recordings/*.ogg
+recordings/*.flac
+*.wav
+*.mp3
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# System files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
+# Logs
+*.log
+
+# Keep directories but not their contents
+!models/.gitkeep
+!recordings/.gitkeep
+!config/.gitkeep
+!scripts/.gitkeep
