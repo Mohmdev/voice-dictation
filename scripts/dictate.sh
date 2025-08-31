@@ -41,15 +41,25 @@ check_dependencies() {
     fi
 }
 
-# Record audio using sox
+# Record audio using parecord with timeout
 record_audio() {
-    echo -e "${YELLOW}Recording... (speak clearly, press Ctrl+C when done)${NC}"
+    echo -e "${YELLOW}Recording... (speak clearly, will stop after 10 seconds or press Ctrl+C)${NC}"
     
-    # Record with automatic silence detection
-    # Stops recording after 1 second of silence
-    sox -d -r 16000 -c 1 -b 16 "$TEMP_AUDIO" silence 1 0.1 1% 1 1.0 1%
+    # Record with timeout using PulseAudio
+    parecord --channels=1 --rate=16000 --format=s16le "$TEMP_AUDIO" &
+    RECORD_PID=$!
     
-    if [ $? -ne 0 ]; then
+    # Wait for up to 10 seconds or until user interrupts
+    sleep 10
+    
+    # Stop recording if still running
+    if kill -0 $RECORD_PID 2>/dev/null; then
+        kill $RECORD_PID 2>/dev/null
+    fi
+    
+    wait $RECORD_PID 2>/dev/null
+    
+    if [ ! -f "$TEMP_AUDIO" ] || [ ! -s "$TEMP_AUDIO" ]; then
         echo -e "${RED}Recording failed${NC}"
         return 1
     fi
@@ -62,8 +72,11 @@ record_audio() {
 record_audio_manual() {
     echo -e "${YELLOW}Recording... (press Ctrl+C to stop)${NC}"
     
-    # Record until user interrupts
-    sox -d -r 16000 -c 1 -b 16 "$TEMP_AUDIO"
+    # Set flag to indicate we're recording
+    MANUAL_RECORDING=true
+    
+    # Record until user interrupts using PulseAudio
+    parecord --channels=1 --rate=16000 --format=s16le "$TEMP_AUDIO"
     
     echo -e "${GREEN}Recording complete${NC}"
     return 0
@@ -81,15 +94,16 @@ transcribe_audio() {
         --print-colors false \
         --print-special false \
         --print-progress false \
+        -l en \
         -t 4 \
-        2>/dev/null | tail -n 1 | sed 's/^[[:space:]]*//')
+        2>/dev/null | tail -n 1 | sed 's/^[[:space:]]*//; s/<|endoftext|>//g; s/^[[:space:]]*//; s/[[:space:]]*$//')
     
     if [ -z "$OUTPUT" ]; then
         echo -e "${RED}Transcription failed or no speech detected${NC}"
         return 1
     fi
     
-    echo -e "${GREEN}Transcription: ${NC}$OUTPUT"
+    # Don't echo here - let main() handle output
     return 0
 }
 
@@ -202,7 +216,7 @@ main() {
     
     # Handle output based on mode
     if [ "$print_only" = true ]; then
-        echo "$OUTPUT"
+        echo -e "${GREEN}Transcription:${NC} $OUTPUT"
     elif [ "$copy_only" = true ]; then
         if command -v xclip &> /dev/null; then
             echo -n "$OUTPUT" | xclip -selection clipboard
@@ -216,8 +230,9 @@ main() {
     fi
 }
 
-# Handle Ctrl+C gracefully
-trap 'echo -e "\n${YELLOW}Stopping recording...${NC}"; exit 0' INT
+# Handle Ctrl+C gracefully - but only exit if not in recording
+MANUAL_RECORDING=false
+trap 'if [ "$MANUAL_RECORDING" = true ]; then echo -e "\n${YELLOW}Stopping recording...${NC}"; MANUAL_RECORDING=false; else exit 0; fi' INT
 
 # Run main function
 main "$@"
