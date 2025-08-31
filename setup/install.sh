@@ -77,7 +77,7 @@ case $CHOICE in
         echo ""
         
         # Create custom shortcut using gsettings
-        SHORTCUT_PATH="/home/$USER/workspace/voice-dictation/scripts/voice-toggle.sh"
+        SHORTCUT_PATH="/home/$USER/workspace/voice-dictation/bin/voice-toggle"
         
         echo "I'll open GNOME Settings for you to add the shortcut manually."
         echo ""
@@ -108,8 +108,8 @@ case $CHOICE in
         else
             echo "" >> ~/.bashrc
             echo "# Voice dictation aliases" >> ~/.bashrc
-            echo "alias vd='$SCRIPT_DIR/scripts/voice-toggle.sh'" >> ~/.bashrc
-            echo "alias dictate='$SCRIPT_DIR/scripts/dictate.sh -m'" >> ~/.bashrc
+            echo "alias vd='$SCRIPT_DIR/bin/voice-toggle'" >> ~/.bashrc
+            echo "alias dictate='$SCRIPT_DIR/bin/dictate -m'" >> ~/.bashrc
             echo -e "${GREEN}✓ Added aliases to ~/.bashrc${NC}"
             echo ""
             echo "Run 'source ~/.bashrc' or restart terminal to use:"
@@ -133,7 +133,7 @@ case $CHOICE in
         
         echo ""
         echo "To test push-to-talk (requires sudo):"
-        echo "  sudo python3 $SCRIPT_DIR/scripts/push-to-talk.py"
+        echo "  sudo $SCRIPT_DIR/bin/voice-ptt"
         echo ""
         echo "Hold Alt+/ to record, release to transcribe"
         echo ""
@@ -148,7 +148,7 @@ After=multi-user.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/python3 $SCRIPT_DIR/scripts/push-to-talk.py
+ExecStart=$SCRIPT_DIR/bin/voice-ptt
 Restart=on-failure
 User=root
 
@@ -167,11 +167,11 @@ EOF
     4)
         echo ""
         echo "Manual setup instructions are in:"
-        echo "  $SCRIPT_DIR/SETUP_SHORTCUTS.md"
+        echo "  $SCRIPT_DIR/docs/SHORTCUTS.md"
         echo ""
         echo "Quick test commands:"
-        echo "  $SCRIPT_DIR/scripts/voice-toggle.sh    # Toggle recording"
-        echo "  $SCRIPT_DIR/scripts/dictate.sh -p      # Print mode test"
+        echo "  $SCRIPT_DIR/bin/voice-toggle    # Toggle recording"
+        echo "  $SCRIPT_DIR/bin/dictate -p      # Print mode test"
         ;;
 esac
 
@@ -179,8 +179,8 @@ echo ""
 echo -e "${GREEN}Setup complete!${NC}"
 echo ""
 echo "Quick reference:"
-echo "  Toggle script: $SCRIPT_DIR/scripts/voice-toggle.sh"
-echo "  Manual mode:   $SCRIPT_DIR/scripts/dictate.sh -m"
-echo "  Push-to-talk:  sudo python3 $SCRIPT_DIR/scripts/push-to-talk.py"
+echo "  Toggle script: $SCRIPT_DIR/bin/voice-toggle"
+echo "  Manual mode:   $SCRIPT_DIR/bin/dictate -m"
+echo "  Push-to-talk:  sudo $SCRIPT_DIR/bin/voice-ptt"
 echo ""
-echo "For more help, see SETUP_SHORTCUTS.md"
+echo "For more help, see docs/SHORTCUTS.md"

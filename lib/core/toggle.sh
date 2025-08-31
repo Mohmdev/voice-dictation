@@ -5,10 +5,10 @@
 # Press once to start recording, press again to stop and transcribe
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 WHISPER_BIN="$HOME/workspace/whisper.cpp/build/bin/whisper-cli"
-MODEL_PATH="$PROJECT_ROOT/models/ggml-base.en.bin"
-RECORDINGS_DIR="$PROJECT_ROOT/recordings"
+MODEL_PATH="$PROJECT_ROOT/data/models/ggml-base.en.bin"
+RECORDINGS_DIR="$PROJECT_ROOT/data/recordings"
 LOCK_FILE="/tmp/voice_dictation.lock"
 PID_FILE="/tmp/voice_dictation.pid"
 AUDIO_FILE="/tmp/voice_dictation.wav"

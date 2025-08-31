@@ -5,11 +5,11 @@
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 WHISPER_PATH="$HOME/workspace/whisper.cpp"
 WHISPER_BIN="$WHISPER_PATH/build/bin/whisper-cli"
-MODEL_PATH="$PROJECT_ROOT/models/ggml-base.en.bin"
-RECORDINGS_DIR="$PROJECT_ROOT/recordings"
+MODEL_PATH="$PROJECT_ROOT/data/models/ggml-base.en.bin"
+RECORDINGS_DIR="$PROJECT_ROOT/data/recordings"
 TEMP_AUDIO="$RECORDINGS_DIR/temp_recording.wav"
 
 # Colors for output
@@ -96,7 +96,7 @@ transcribe_audio() {
         --print-progress false \
         -l en \
         -t 4 \
-        2>/dev/null | tail -n 1 | sed 's/^[[:space:]]*//; s/<|endoftext|>//g; s/^[[:space:]]*//; s/[[:space:]]*$//')
+        2>/dev/null | tail -n 1 | sed 's/\x1b\[[0-9;]*m//g; s/<|endoftext|>//g; s/^[[:space:]]*//; s/[[:space:]]*$//')
     
     if [ -z "$OUTPUT" ]; then
         echo -e "${RED}Transcription failed or no speech detected${NC}"

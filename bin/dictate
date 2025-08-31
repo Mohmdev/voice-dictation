@@ -1,0 +1,9 @@
+#!/bin/bash
+# Voice Dictation CLI - Main entry point
+
+# Get the directory where this script is located
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$BIN_DIR")"
+
+# Execute the core dictation script
+exec "$PROJECT_ROOT/lib/core/dictate.sh" "$@"

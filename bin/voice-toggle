@@ -1,0 +1,9 @@
+#!/bin/bash
+# Voice Toggle - Toggle recording mode for keyboard shortcuts
+
+# Get the directory where this script is located
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$BIN_DIR")"
+
+# Execute the toggle script
+exec "$PROJECT_ROOT/lib/core/toggle.sh" "$@"

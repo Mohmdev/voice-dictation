@@ -14,11 +14,15 @@ A powerful, **FREE**, offline voice dictation system with multiple input modes i
 ## 🚀 Quick Start
 
 ```bash
-# Run the interactive installer
-./install-shortcuts.sh
+# 1. Download the Whisper model (142MB, one-time)
+make download-model
 
-# Or test immediately with toggle mode (no sudo needed!)
-./scripts/voice-toggle.sh  # Press once to start, again to stop
+# 2. Check dependencies and install
+make check-deps
+make install
+
+# Or run directly without installation
+./bin/voice-toggle  # Press once to start, again to stop
 ```
 
 ## 📦 Installation
@@ -39,14 +43,20 @@ pip install evdev  # or sudo dnf install python3-evdev
 ### Setup
 
 1. **Clone and compile** (already done if you're reading this)
-2. **Run the installer**:
+2. **Download the model** (142MB, one-time):
    ```bash
-   ./install-shortcuts.sh
+   make download-model  # Or: ./setup/download-model.sh
    ```
-3. **Choose your setup**:
-   - Option 1: GNOME keyboard shortcut (recommended)
-   - Option 2: Terminal aliases
-   - Option 3: Push-to-talk daemon
+3. **Install with Make**:
+   ```bash
+   make check-deps  # Verify dependencies
+   make install     # Install to ~/.local
+   ```
+4. **Set up shortcuts**:
+   ```bash
+   make setup-gnome  # For GNOME keyboard shortcut
+   # Or run setup/install.sh for interactive setup
+   ```
 
 ## 🎤 Usage Modes
 
@@ -54,7 +64,7 @@ pip install evdev  # or sudo dnf install python3-evdev
 Best for GNOME keyboard shortcuts.
 
 ```bash
-./scripts/voice-toggle.sh
+./bin/voice-toggle
 ```
 - **Press hotkey once** → Start recording (notification appears)
 - **Press hotkey again** → Stop, transcribe, type text
@@ -63,14 +73,17 @@ Best for GNOME keyboard shortcuts.
 **Setup GNOME Shortcut:**
 1. Settings → Keyboard → View and Customize Shortcuts
 2. Add Custom Shortcut
-3. Command: `/home/$USER/workspace/voice-dictation/scripts/voice-toggle.sh`
+3. Command: `~/.local/bin/voice-toggle` (after installation)
+   Or: `/home/$USER/workspace/voice-dictation/bin/voice-toggle`
 4. Set key: `Super+V` or `Alt+/`
 
 ### 2. Push-to-Talk (Most Natural)
 Like Discord/gaming - hold key to record.
 
 ```bash
-sudo python3 ./scripts/push-to-talk.py
+sudo ./bin/voice-ptt
+# Or after installation:
+sudo voice-ptt
 ```
 - **Hold `Alt+/`** → Recording
 - **Release** → Transcribes & types
@@ -86,17 +99,21 @@ sudo systemctl start voice-ptt.service
 Terminal-based, full control.
 
 ```bash
-./scripts/dictate.sh -m     # Manual mode (Ctrl+C to stop)
-./scripts/dictate.sh -p     # Auto-stop mode, print only
-./scripts/dictate.sh        # Auto-type mode
+./bin/dictate -m     # Manual mode (Ctrl+C to stop)
+./bin/dictate -p     # Auto-stop mode, print only
+./bin/dictate        # Auto-type mode
+# Or after installation: just 'dictate'
 ```
 
 ### Terminal Aliases
 
 Add to `~/.bashrc`:
 ```bash
-alias vd='~/workspace/voice-dictation/scripts/voice-toggle.sh'
-alias dictate='~/workspace/voice-dictation/scripts/dictate.sh -m'
+alias vd='voice-toggle'    # After make install
+alias dictate='dictate -m'  # After make install
+# Or without installation:
+alias vd='~/workspace/voice-dictation/bin/voice-toggle'
+alias dictate='~/workspace/voice-dictation/bin/dictate -m'
 ```
 
 ## 🛠️ Configuration
@@ -104,15 +121,22 @@ alias dictate='~/workspace/voice-dictation/scripts/dictate.sh -m'
 ### Project Structure
 ```
 voice-dictation/
-├── scripts/
-│   ├── dictate.sh         # Original dictation script
-│   ├── voice-toggle.sh    # Toggle mode for shortcuts
-│   ├── push-to-talk.py    # Push-to-talk daemon
-│   └── setup-alias.sh     # Alias installer
-├── models/
-│   └── ggml-base.en.bin   # Whisper model (142MB)
-├── recordings/            # Temporary audio files
-└── install-shortcuts.sh   # Interactive installer
+├── bin/                   # User executables
+│   ├── dictate           # Main CLI
+│   ├── voice-toggle      # Toggle mode
+│   └── voice-ptt         # Push-to-talk
+├── lib/core/             # Core implementations
+│   ├── dictate.sh        # Original script
+│   ├── toggle.sh         # Toggle logic
+│   └── ptt.py           # PTT daemon
+├── data/                 # Runtime data
+│   ├── models/          # Whisper models
+│   └── recordings/      # Temp audio
+├── setup/               # Installation
+│   └── install.sh       # Setup script
+├── test/                # Test scripts
+├── docs/                # Documentation
+└── Makefile            # Build system
 ```
 
 ### Whisper Models
@@ -160,7 +184,9 @@ pavucontrol  # GUI mixer
 ### Push-to-talk not detecting keys?
 ```bash
 # Must run with sudo
-sudo python3 scripts/push-to-talk.py
+sudo ./bin/voice-ptt
+# Or after installation:
+sudo voice-ptt
 
 # Check python-evdev
 python3 -c "import evdev"  # Should not error

@@ -1,9 +1,16 @@
 # Whisper models (large files)
+data/models/*.bin
+data/models/*.ggml
+data/models/*.gguf
 models/*.bin
 models/*.ggml
 models/*.gguf
 
 # Audio recordings
+data/recordings/*.wav
+data/recordings/*.mp3
+data/recordings/*.ogg
+data/recordings/*.flac
 recordings/*.wav
 recordings/*.mp3
 recordings/*.ogg

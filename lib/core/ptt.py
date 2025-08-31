@@ -25,8 +25,8 @@ except ImportError:
 
 # Configuration
 WHISPER_BIN = Path.home() / "workspace/whisper.cpp/build/bin/whisper-cli"
-MODEL_PATH = Path.home() / "workspace/voice-dictation/models/ggml-base.en.bin"
-RECORDINGS_DIR = Path.home() / "workspace/voice-dictation/recordings"
+MODEL_PATH = Path.home() / "workspace/voice-dictation/data/models/ggml-base.en.bin"
+RECORDINGS_DIR = Path.home() / "workspace/voice-dictation/data/recordings"
 
 # Key configuration (Alt + /)
 MODIFIER_KEY = ecodes.KEY_LEFTALT  # or KEY_RIGHTALT
