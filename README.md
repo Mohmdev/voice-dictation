@@ -93,14 +93,18 @@ Like Discord/gaming - hold key to record.
 ```bash
 # 1. Add yourself to input group (for keyboard access)
 sudo usermod -a -G input $USER
-newgrp input  # Apply group change (or log out/in)
 
 # 2. Start ydotool daemon (for auto-typing)
 ydotoold &
 
-# 3. Run push-to-talk (no sudo needed!)
-./bin/voice-ptt
+# 3. Run push-to-talk (secure wrapper - no permanent group changes!)
+./bin/ptt
 ```
+
+**Why use `ptt` instead of `voice-ptt`?**
+- `./bin/ptt` uses temporary input group permissions (more secure)
+- `./bin/voice-ptt` requires permanent group activation (`newgrp input` after each terminal)
+- Same functionality, better security model
 
 **Usage:**
 - **Hold `Right Alt (AltGr)`** → Recording
@@ -141,7 +145,8 @@ voice-dictation/
 ├── bin/                   # User executables
 │   ├── dictate           # Main CLI
 │   ├── voice-toggle      # Toggle mode
-│   └── voice-ptt         # Push-to-talk
+│   ├── voice-ptt         # Push-to-talk daemon
+│   └── ptt               # Secure PTT wrapper
 ├── lib/core/             # Core implementations
 │   ├── dictate.sh        # Original script
 │   ├── toggle.sh         # Toggle logic

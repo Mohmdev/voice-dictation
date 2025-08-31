@@ -63,7 +63,7 @@ install: check-deps
 	
 	# Install binaries
 	@cp -v bin/* $(BINDIR)/
-	@chmod +x $(BINDIR)/dictate $(BINDIR)/voice-toggle $(BINDIR)/voice-ptt
+	@chmod +x $(BINDIR)/dictate $(BINDIR)/voice-toggle $(BINDIR)/voice-ptt $(BINDIR)/ptt
 	
 	# Install libraries
 	@cp -rv lib/* $(LIBDIR)/
@@ -87,7 +87,8 @@ install: check-deps
 	@echo "Commands available:"
 	@echo "  dictate        - Manual voice dictation"
 	@echo "  voice-toggle   - Toggle recording mode"
-	@echo "  voice-ptt      - Push-to-talk daemon (needs sudo)"
+	@echo "  ptt            - Push-to-talk (secure wrapper)"
+	@echo "  voice-ptt      - Push-to-talk daemon (direct)"
 
 # System-wide installation
 install-system:
@@ -99,6 +100,7 @@ uninstall:
 	@rm -f $(BINDIR)/dictate
 	@rm -f $(BINDIR)/voice-toggle
 	@rm -f $(BINDIR)/voice-ptt
+	@rm -f $(BINDIR)/ptt
 	@rm -rf $(LIBDIR)
 	@rm -rf $(DATADIR)
 	@echo "$(GREEN)✓ Uninstalled$(NC)"
@@ -152,4 +154,5 @@ dev-install:
 	@ln -sf $(PWD)/bin/dictate $(BINDIR)/dictate
 	@ln -sf $(PWD)/bin/voice-toggle $(BINDIR)/voice-toggle
 	@ln -sf $(PWD)/bin/voice-ptt $(BINDIR)/voice-ptt
+	@ln -sf $(PWD)/bin/ptt $(BINDIR)/ptt
 	@echo "$(GREEN)✓ Development links created$(NC)"

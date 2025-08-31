@@ -1,0 +1,9 @@
+#!/bin/bash
+# ptt - Push-to-Talk with temporary input group permissions
+# Launches voice-ptt with sg (switch group) for security
+
+# Get the directory where this script is located
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Use sg to run voice-ptt with input group temporarily (no permanent changes)
+exec sg input -c "$BIN_DIR/voice-ptt"
