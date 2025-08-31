@@ -5,12 +5,5 @@
 BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$BIN_DIR")"
 
-# Check if running as root (required for evdev)
-if [ "$EUID" -ne 0 ]; then 
-    echo "Push-to-talk requires root access for keyboard monitoring."
-    echo "Run with: sudo $0"
-    exit 1
-fi
-
-# Execute the push-to-talk daemon
+# Execute the push-to-talk daemon (it handles permission checking)
 exec python3 "$PROJECT_ROOT/lib/core/ptt.py" "$@"

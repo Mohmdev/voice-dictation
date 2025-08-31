@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """
 Push-to-Talk Voice Dictation Daemon
-Monitors keyboard for Alt+/ hold to record, transcribes on release
-Works on Wayland/GNOME using evdev (requires sudo)
+Hold Right Alt (AltGr) to record, release to transcribe
+Works on Wayland/GNOME using evdev
+
+Preferred: Add user to input group to run without sudo
+Alternative: Run with sudo (may have audio issues)
 """
 
 import os
@@ -12,6 +15,7 @@ import signal
 import subprocess
 import threading
 import tempfile
+import grp
 from pathlib import Path
 from typing import Optional
 
@@ -24,21 +28,31 @@ except ImportError:
     sys.exit(1)
 
 # Configuration
-WHISPER_BIN = Path.home() / "workspace/whisper.cpp/build/bin/whisper-cli"
-MODEL_PATH = Path.home() / "workspace/voice-dictation/data/models/ggml-base.en.bin"
-RECORDINGS_DIR = Path.home() / "workspace/voice-dictation/data/recordings"
+# Get user home directory (works for both sudo and regular user)
+import pwd
 
-# Key configuration (Alt + /)
-MODIFIER_KEY = ecodes.KEY_LEFTALT  # or KEY_RIGHTALT
-TRIGGER_KEY = ecodes.KEY_SLASH
+if os.geteuid() == 0:
+    # Running as root, get original user
+    ACTUAL_USER = os.environ.get('SUDO_USER', os.environ.get('USER'))
+    USER_HOME = pwd.getpwnam(ACTUAL_USER).pw_dir if ACTUAL_USER else str(Path.home())
+else:
+    # Running as regular user
+    ACTUAL_USER = os.environ.get('USER')
+    USER_HOME = str(Path.home())
+
+WHISPER_BIN = Path(USER_HOME) / "workspace/whisper.cpp/build/bin/whisper-cli"
+MODEL_PATH = Path(USER_HOME) / "workspace/voice-dictation/data/models/ggml-base.en.bin"
+RECORDINGS_DIR = Path(USER_HOME) / "workspace/voice-dictation/data/recordings"
+
+# Key configuration - Just Right Alt (AltGr)
+RECORD_KEY = ecodes.KEY_RIGHTALT  # Hold to record, release to transcribe
 
 class PushToTalkDaemon:
     def __init__(self):
         self.recording = False
         self.recording_process = None
         self.temp_audio = None
-        self.alt_pressed = False
-        self.slash_pressed = False
+        self.recording_key_pressed = False
         
         # Ensure recordings directory exists
         RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
@@ -50,20 +64,55 @@ class PushToTalkDaemon:
             sys.exit(1)
         
         print(f"Using keyboard: {self.keyboard.name}")
-        print("Push-to-Talk ready! Hold Alt+/ to record, release to transcribe.")
-        print("Press Ctrl+C to exit.")
+        print("")
+        print("🎤 Push-to-Talk ready!")
+        print("📌 Hold Right Alt (AltGr) to record")
+        print("📝 Release to transcribe and type")
+        print("❌ Press Ctrl+C to exit")
     
     def find_keyboard(self) -> Optional[InputDevice]:
-        """Find the first keyboard device"""
+        """Find the first physical keyboard device (skip virtual devices)"""
         devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
-        for device in devices:
+        keyboards = []
+        
+        for i, device in enumerate(devices):
             capabilities = device.capabilities(verbose=True)
             # Check if device has KEY events and common keyboard keys
             if ('EV_KEY', 1) in capabilities:
                 keys = capabilities[('EV_KEY', 1)]
                 # Check for alphabetic keys to identify keyboard
                 if any('KEY_A' in str(key) for key in keys):
+                    # Skip virtual devices like ydotoold
+                    if 'virtual' not in device.name.lower():
+                        keyboards.append(device)
+                        print(f"  [{len(keyboards)}] {device.name}")
+        
+        # If we found keyboards, ask which one to use
+        if keyboards:
+            if len(keyboards) == 1:
+                return keyboards[0]
+            else:
+                print(f"\nMultiple keyboards found. Which one are you using?")
+                try:
+                    choice = input(f"Enter number [1-{len(keyboards)}] (default: 1): ").strip()
+                    if not choice:
+                        return keyboards[0]
+                    idx = int(choice) - 1
+                    if 0 <= idx < len(keyboards):
+                        return keyboards[idx]
+                except (ValueError, IndexError):
+                    pass
+                return keyboards[0]
+        
+        # If no physical keyboards found, try any keyboard (but warn)
+        print("Warning: No physical keyboard found, trying virtual devices...")
+        for device in devices:
+            capabilities = device.capabilities(verbose=True)
+            if ('EV_KEY', 1) in capabilities:
+                keys = capabilities[('EV_KEY', 1)]
+                if any('KEY_A' in str(key) for key in keys):
                     return device
+        
         return None
     
     def start_recording(self):
@@ -78,22 +127,104 @@ class PushToTalkDaemon:
             delete=False
         )
         
-        print("\n🎤 Recording... (release Alt+/ to stop)")
+        print("\n🎤 Recording... (release Right Alt to stop)")
         
-        # Start recording with parecord
-        cmd = [
-            'parecord',
-            '--channels=1',
-            '--rate=16000',
-            '--format=s16le',
-            self.temp_audio.name
-        ]
+        # Try multiple recording methods in order of preference
+        if os.geteuid() == 0:
+            # Running as root - prefer FFmpeg (with corrected syntax)
+            recording_methods = [
+                {
+                    'name': 'FFmpeg (PulseAudio)',
+                    'cmd': ['ffmpeg', '-f', 'pulse', '-ac', '1', '-ar', '16000', '-i', 'default', '-y', self.temp_audio.name],
+                    'quiet': True
+                },
+                {
+                    'name': 'FFmpeg (ALSA hw:1,0)',
+                    'cmd': ['ffmpeg', '-f', 'alsa', '-ac', '1', '-ar', '16000', '-i', 'hw:1,0', '-y', self.temp_audio.name],
+                    'quiet': True
+                },
+                {
+                    'name': 'FFmpeg (ALSA default)',
+                    'cmd': ['ffmpeg', '-f', 'alsa', '-ac', '1', '-ar', '16000', '-i', 'default', '-y', self.temp_audio.name],
+                    'quiet': True
+                }
+            ]
+        else:
+            # Running as regular user - prefer native tools
+            recording_methods = [
+                {
+                    'name': 'pw-record (PipeWire)',
+                    'cmd': ['pw-record', '--channels=1', '--rate=48000', '--format=s16le', self.temp_audio.name],
+                    'quiet': False
+                },
+                {
+                    'name': 'parecord (PulseAudio/PipeWire)',
+                    'cmd': ['parecord', '--channels=1', '--rate=48000', '--format=s16le', self.temp_audio.name],
+                    'quiet': False
+                },
+                {
+                    'name': 'FFmpeg (PulseAudio/PipeWire)',
+                    'cmd': ['ffmpeg', '-f', 'pulse', '-ac', '1', '-ar', '48000', '-i', 'default', '-y', self.temp_audio.name],
+                    'quiet': True
+                },
+                {
+                    'name': 'FFmpeg (ALSA hw:1,0)', 
+                    'cmd': ['ffmpeg', '-f', 'alsa', '-ac', '1', '-ar', '16000', '-i', 'hw:1,0', '-y', self.temp_audio.name],
+                    'quiet': True
+                },
+                {
+                    'name': 'FFmpeg (ALSA default)', 
+                    'cmd': ['ffmpeg', '-f', 'alsa', '-ac', '1', '-ar', '16000', '-i', 'default', '-y', self.temp_audio.name],
+                    'quiet': True
+                },
+                {
+                    'name': 'arecord (ALSA hw:1,0)',
+                    'cmd': ['arecord', '-D', 'hw:1,0', '-f', 'S16_LE', '-r', '48000', '-c', '1', '-q', self.temp_audio.name],
+                    'quiet': True
+                },
+                {
+                    'name': 'arecord (ALSA default)',
+                    'cmd': ['arecord', '-D', 'default', '-f', 'S16_LE', '-r', '48000', '-c', '1', '-q', self.temp_audio.name],
+                    'quiet': True
+                }
+            ]
         
-        self.recording_process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
-        )
+        self.recording_process = None
+        
+        for method in recording_methods:
+            try:
+                # For FFmpeg, add quiet flags
+                cmd = method['cmd'].copy()
+                if method['quiet'] and 'ffmpeg' in cmd[0]:
+                    cmd.extend(['-loglevel', 'quiet'])
+                
+                self.recording_process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.DEVNULL if method['quiet'] else subprocess.PIPE,
+                    stderr=subprocess.DEVNULL if method['quiet'] else subprocess.PIPE
+                )
+                
+                # Give it a moment to start
+                time.sleep(0.2)
+                
+                # Check if it started successfully
+                if self.recording_process.poll() is None:
+                    print(f"✓ Recording with {method['name']}")
+                    break
+                else:
+                    # Process failed, try next method
+                    continue
+                    
+            except FileNotFoundError:
+                # Command not found, try next method
+                continue
+        
+        # If no method worked
+        if not self.recording_process or self.recording_process.poll() is not None:
+            print("❌ All recording methods failed")
+            print("Try: sudo dnf install sox pulseaudio-utils")
+            self.recording = False
+            self.recording_process = None
     
     def stop_recording_and_transcribe(self):
         """Stop recording and transcribe the audio"""
@@ -104,16 +235,55 @@ class PushToTalkDaemon:
         
         # Stop recording
         self.recording_process.terminate()
-        self.recording_process.wait(timeout=1)
+        self.recording_process.communicate(timeout=1)
         
         print("⏹️  Stopped recording")
+        
+        # Check file size to ensure we have audio
+        if self.temp_audio:
+            file_size = os.path.getsize(self.temp_audio.name)
+            if file_size < 1000:
+                print("❌ No audio recorded - speak louder or check microphone")
+                return
+        
         print("🔄 Transcribing...")
+        
+        # Check if we need to resample (Whisper expects 16kHz)
+        # If we recorded at 48kHz, resample first
+        whisper_audio_file = self.temp_audio.name
+        if os.path.getsize(self.temp_audio.name) > 1000:
+            # Try to resample with ffmpeg if needed
+            try:
+                import subprocess
+                import tempfile
+                
+                # Create temp file for resampled audio
+                resampled_audio = tempfile.NamedTemporaryFile(suffix='.wav', dir=RECORDINGS_DIR, delete=False)
+                
+                # Resample to 16kHz for Whisper
+                resample_cmd = [
+                    'ffmpeg', '-i', self.temp_audio.name, 
+                    '-ar', '16000', '-ac', '1', '-y', 
+                    resampled_audio.name
+                ]
+                
+                result = subprocess.run(resample_cmd, capture_output=True, timeout=5)
+                if result.returncode == 0 and os.path.getsize(resampled_audio.name) > 100:
+                    whisper_audio_file = resampled_audio.name
+                    print("✓ Resampled audio for Whisper")
+                else:
+                    # Use original file if resampling failed
+                    os.unlink(resampled_audio.name)
+                    
+            except Exception:
+                # If resampling fails, use original file
+                pass
         
         # Transcribe with whisper
         cmd = [
             str(WHISPER_BIN),
             '-m', str(MODEL_PATH),
-            '-f', self.temp_audio.name,
+            '-f', whisper_audio_file,
             '--no-timestamps',
             '--print-colors', 'false',
             '--print-special', 'false',
@@ -137,6 +307,12 @@ class PushToTalkDaemon:
                 transcription = lines[-1].strip()
                 transcription = transcription.replace('<|endoftext|>', '').strip()
                 
+                # Remove all ANSI escape sequences (color codes, etc.)
+                import re
+                transcription = re.sub(r'\x1b\[[0-9;]*m', '', transcription)
+                transcription = re.sub(r'\x1b\[[0-9]*[A-Za-z]', '', transcription)
+                transcription = transcription.strip()
+                
                 if transcription:
                     print(f"✅ Transcribed: {transcription}")
                     self.type_text(transcription)
@@ -157,7 +333,7 @@ class PushToTalkDaemon:
     
     def type_text(self, text: str):
         """Type the transcribed text using ydotool or xdotool"""
-        # Try ydotool first (Wayland compatible)
+        # Try ydotool first (works on Wayland with daemon)
         if self.try_ydotool(text):
             return
         
@@ -227,28 +403,17 @@ class PushToTalkDaemon:
                 if event.type == ecodes.EV_KEY:
                     key_event = categorize(event)
                     
-                    # Track Alt key state
-                    if key_event.keycode == MODIFIER_KEY:
+                    # Track Right Alt key state
+                    # keycode from categorize is a string like 'KEY_RIGHTALT'
+                    if 'KEY_RIGHTALT' in str(key_event.keycode):
                         if key_event.keystate == 1:  # Key down
-                            self.alt_pressed = True
-                        elif key_event.keystate == 0:  # Key up
-                            self.alt_pressed = False
-                            # If slash was pressed with alt, stop recording
-                            if self.slash_pressed:
-                                self.slash_pressed = False
-                                self.stop_recording_and_transcribe()
-                    
-                    # Track Slash key state
-                    elif key_event.keycode == TRIGGER_KEY:
-                        if key_event.keystate == 1:  # Key down
-                            self.slash_pressed = True
-                            # Start recording if Alt is held
-                            if self.alt_pressed:
+                            if not self.recording_key_pressed:
+                                self.recording_key_pressed = True
                                 self.start_recording()
                         elif key_event.keystate == 0:  # Key up
-                            if self.slash_pressed and self.alt_pressed:
+                            if self.recording_key_pressed:
+                                self.recording_key_pressed = False
                                 self.stop_recording_and_transcribe()
-                            self.slash_pressed = False
                     
         except KeyboardInterrupt:
             print("\n👋 Exiting push-to-talk daemon")
@@ -258,13 +423,32 @@ class PushToTalkDaemon:
 
 def check_requirements():
     """Check if all requirements are met"""
-    if os.geteuid() != 0:
-        print("Error: This script needs root access to monitor keyboard events.")
-        print("Run with: sudo python3 push-to-talk.py")
+    
+    # Check if user is in input group (preferred method)
+    user_groups = [grp.getgrgid(g).gr_name for g in os.getgroups()]
+    if 'input' not in user_groups and os.geteuid() != 0:
+        print("Error: This script needs keyboard access.")
+        print("")
+        print("RECOMMENDED: Add your user to the input group:")
+        print("  sudo usermod -a -G input $USER")
+        print("  newgrp input  # or log out/in")
+        print("  ./bin/voice-ptt  # run WITHOUT sudo")
+        print("")
+        print("ALTERNATIVE: Run with sudo:")
+        print("  sudo ./bin/voice-ptt")
         sys.exit(1)
+    
+    if os.geteuid() == 0:
+        print(f"⚠️  Running as root - audio may not work")
+        print(f"✓ User: {ACTUAL_USER} (home: {USER_HOME})")
+    else:
+        print(f"✓ Running as: {os.environ.get('USER')} (recommended)")
+        print(f"✓ Has keyboard access via input group")
     
     if not WHISPER_BIN.exists():
         print(f"Error: Whisper not found at {WHISPER_BIN}")
+        print(f"Current user: {ACTUAL_USER}")
+        print(f"Looking in: {USER_HOME}/workspace/whisper.cpp/build/bin/")
         sys.exit(1)
     
     if not MODEL_PATH.exists():

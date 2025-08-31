@@ -51,19 +51,42 @@ if [ -f "$LOCK_FILE" ]; then
             echo "Transcribed: $OUTPUT"
             
             # Try to type the text
-            if command -v ydotool &> /dev/null; then
-                ydotool type "$OUTPUT"
-            elif command -v xdotool &> /dev/null; then
+            typed=false
+            
+            # Try wtype first (best for Wayland)
+            if command -v wtype &> /dev/null; then
+                sleep 0.3  # Give time to focus target window
+                if wtype "$OUTPUT" 2>/dev/null; then
+                    typed=true
+                fi
+            fi
+            
+            # Try ydotool if wtype failed
+            if [ "$typed" = false ] && command -v ydotool &> /dev/null && [ -S "/run/user/$(id -u)/.ydotool_socket" ]; then
+                if ydotool type "$OUTPUT" 2>/dev/null; then
+                    typed=true
+                fi
+            fi
+            
+            # Try xdotool if both failed
+            if [ "$typed" = false ] && command -v xdotool &> /dev/null; then
                 sleep 0.3
-                xdotool type "$OUTPUT"
-            elif command -v wl-copy &> /dev/null; then
-                echo -n "$OUTPUT" | wl-copy
-                notify-send "Voice Dictation" "Text copied to clipboard"
-            elif command -v xclip &> /dev/null; then
-                echo -n "$OUTPUT" | xclip -selection clipboard
-                notify-send "Voice Dictation" "Text copied to clipboard"
-            else
-                echo "$OUTPUT"
+                if xdotool type "$OUTPUT" 2>/dev/null; then
+                    typed=true
+                fi
+            fi
+            
+            # Fall back to clipboard if typing failed
+            if [ "$typed" = false ]; then
+                if command -v wl-copy &> /dev/null; then
+                    echo -n "$OUTPUT" | wl-copy
+                    notify-send "Voice Dictation" "Text copied to clipboard (Ctrl+V to paste)"
+                elif command -v xclip &> /dev/null; then
+                    echo -n "$OUTPUT" | xclip -selection clipboard
+                    notify-send "Voice Dictation" "Text copied to clipboard (Ctrl+V to paste)"
+                else
+                    echo "$OUTPUT"
+                fi
             fi
         else
             notify-send "Voice Dictation" "No speech detected"
