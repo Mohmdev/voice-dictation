@@ -1,178 +1,220 @@
-# Voice Dictation for Terminal
+# Voice Dictation for Linux
 
-A lightweight, **FREE**, offline voice dictation tool for Linux terminals using OpenAI's Whisper model running locally.
+A powerful, **FREE**, offline voice dictation system with multiple input modes including push-to-talk and keyboard shortcuts. Uses OpenAI's Whisper model running locally - no cloud, no API costs, complete privacy.
 
-## Features
+## ✨ Features
 
-- **100% Free**: Uses open-source Whisper model, no API costs
-- **Offline**: Works without internet connection after setup
-- **Fast**: ~3-5 seconds to transcribe 10 seconds of speech
-- **Lightweight**: Runs on older hardware (tested on i7-4710HQ with 8GB RAM)
-- **Terminal-friendly**: Designed for SSH sessions and terminal workflows
+- **🎯 Three Input Modes**: Toggle, Push-to-Talk, or Manual
+- **⌨️ Keyboard Shortcuts**: Works with GNOME/Wayland hotkeys
+- **🔒 100% Private**: Runs offline, no data leaves your machine
+- **💰 Completely Free**: Uses open-source Whisper model
+- **🚀 Fast**: 3-5 seconds to transcribe speech
+- **🖥️ Wayland/X11**: Works on modern and legacy systems
 
-## Quick Start
+## 🚀 Quick Start
 
 ```bash
-# Test the voice dictation
-./scripts/dictate.sh -p
+# Run the interactive installer
+./install-shortcuts.sh
 
-# Set up convenient alias
-./scripts/setup-alias.sh
-source ~/.bashrc
-
-# Now you can use from anywhere:
-dictate           # Record and auto-type transcribed text
-dictate -m        # Manual recording (Ctrl+C to stop)
-dictate -p        # Print transcription only
-dictate -c        # Copy to clipboard only
+# Or test immediately with toggle mode (no sudo needed!)
+./scripts/voice-toggle.sh  # Press once to start, again to stop
 ```
 
-## Project Structure
+## 📦 Installation
 
-```
-voice-dictation/
-├── scripts/          # Main scripts
-│   ├── dictate.sh    # Voice dictation tool
-│   └── setup-alias.sh # Setup convenience alias
-├── models/           # Whisper models (150MB+)
-│   └── ggml-base.en.bin
-├── recordings/       # Temporary audio files
-└── config/          # Configuration (future)
-```
+### Prerequisites
 
-## How It Works
-
-1. **Recording**: Uses `sox` to capture audio from your microphone
-2. **Transcription**: Processes audio through Whisper.cpp (running locally)
-3. **Output**: Can type text directly, copy to clipboard, or print to stdout
-
-## Recording Modes
-
-- **Auto-stop** (default): Stops recording after 1 second of silence
-- **Manual** (`-m`): Record until you press Ctrl+C
-
-## Output Modes
-
-- **Auto-type** (default): Types transcribed text using xdotool
-- **Copy** (`-c`): Copies to clipboard using xclip
-- **Print** (`-p`): Outputs to terminal only
-
-## System Requirements
-
-- **CPU**: Any x86_64 processor (4+ cores recommended)
-- **RAM**: 2GB minimum (4GB+ recommended)
-- **Disk**: ~200MB for model and binaries
-- **OS**: Linux (tested on Fedora, Ubuntu)
-
-## Dependencies
-
-Already installed:
-- gcc/g++ (for compilation)
-- cmake (build system)
-- sox (audio recording)
-- whisper.cpp (transcription engine)
-- Whisper model (ggml-base.en.bin, 121MB)
-
-Optional (for enhanced features):
-- xdotool (for auto-typing text)
-- xclip (for clipboard support)
-
-To install optional dependencies:
 ```bash
-# Fedora
-sudo dnf install xdotool xclip
+# Required packages
+sudo dnf install gcc-c++ cmake sox pulseaudio-utils
 
-# Ubuntu/Debian
-sudo apt install xdotool xclip
+# For auto-typing (recommended)
+sudo dnf install ydotool wl-clipboard
+
+# For push-to-talk mode
+pip install evdev  # or sudo dnf install python3-evdev
 ```
 
-## Hotkey Setup (Optional)
+### Setup
 
-To bind voice dictation to a hotkey (e.g., Super+V):
+1. **Clone and compile** (already done if you're reading this)
+2. **Run the installer**:
+   ```bash
+   ./install-shortcuts.sh
+   ```
+3. **Choose your setup**:
+   - Option 1: GNOME keyboard shortcut (recommended)
+   - Option 2: Terminal aliases
+   - Option 3: Push-to-talk daemon
 
-### For GNOME (Fedora default)
-1. Open Settings → Keyboard → Keyboard Shortcuts
-2. Add custom shortcut:
-   - Name: Voice Dictation
-   - Command: `/home/$USER/workspace/voice-dictation/scripts/dictate.sh`
-   - Shortcut: Super+V (or your preference)
+## 🎤 Usage Modes
 
-### For terminal hotkeys
+### 1. Toggle Mode (Easiest - No sudo)
+Best for GNOME keyboard shortcuts.
+
+```bash
+./scripts/voice-toggle.sh
+```
+- **Press hotkey once** → Start recording (notification appears)
+- **Press hotkey again** → Stop, transcribe, type text
+- **No sudo required!**
+
+**Setup GNOME Shortcut:**
+1. Settings → Keyboard → View and Customize Shortcuts
+2. Add Custom Shortcut
+3. Command: `/home/$USER/workspace/voice-dictation/scripts/voice-toggle.sh`
+4. Set key: `Super+V` or `Alt+/`
+
+### 2. Push-to-Talk (Most Natural)
+Like Discord/gaming - hold key to record.
+
+```bash
+sudo python3 ./scripts/push-to-talk.py
+```
+- **Hold `Alt+/`** → Recording
+- **Release** → Transcribes & types
+- **Requires sudo** (for keyboard monitoring)
+
+**Optional: Run as service**
+```bash
+sudo systemctl enable voice-ptt.service
+sudo systemctl start voice-ptt.service
+```
+
+### 3. Manual Mode (Original)
+Terminal-based, full control.
+
+```bash
+./scripts/dictate.sh -m     # Manual mode (Ctrl+C to stop)
+./scripts/dictate.sh -p     # Auto-stop mode, print only
+./scripts/dictate.sh        # Auto-type mode
+```
+
+### Terminal Aliases
+
 Add to `~/.bashrc`:
 ```bash
-# Ctrl+Alt+D for dictation
-bind '"\e\C-d": "dictate\n"'
+alias vd='~/workspace/voice-dictation/scripts/voice-toggle.sh'
+alias dictate='~/workspace/voice-dictation/scripts/dictate.sh -m'
 ```
 
-## Performance
+## 🛠️ Configuration
 
-- **Model**: base.en (121MB, English-only, optimized)
-- **Speed**: ~3-5 seconds for 10 seconds of audio
-- **Accuracy**: Excellent for English, handles accents well
-- **CPU Usage**: Moderate during transcription (few seconds)
+### Project Structure
+```
+voice-dictation/
+├── scripts/
+│   ├── dictate.sh         # Original dictation script
+│   ├── voice-toggle.sh    # Toggle mode for shortcuts
+│   ├── push-to-talk.py    # Push-to-talk daemon
+│   └── setup-alias.sh     # Alias installer
+├── models/
+│   └── ggml-base.en.bin   # Whisper model (142MB)
+├── recordings/            # Temporary audio files
+└── install-shortcuts.sh   # Interactive installer
+```
 
-## Tips for Best Results
+### Whisper Models
 
-1. **Speak clearly** and at normal pace
-2. **Minimize background noise** for better accuracy
-3. **Use manual mode** (`-m`) for longer dictations
-4. **Test with print mode** (`-p`) first to verify setup
+Current: `base.en` (142MB, good accuracy)
 
-## Troubleshooting
-
-### No audio recorded
-- Check microphone permissions
-- Test with: `sox -d test.wav` (Ctrl+C to stop)
-- Verify audio device: `arecord -l`
-
-### Transcription errors
-- Speak more clearly
-- Reduce background noise
-- Try manual recording mode: `dictate -m`
-
-### Text not typing automatically
-- Install xdotool: `sudo dnf install xdotool`
-- Use clipboard mode instead: `dictate -c`
-
-## Advanced Usage
-
-### Different Whisper models
-
-For better accuracy (slower, larger):
+For better accuracy:
 ```bash
-# Download larger model (if needed)
 cd ~/workspace/whisper.cpp
 bash ./models/download-ggml-model.sh small.en  # 466MB
-
-# Update MODEL_PATH in dictate.sh
+# Update MODEL_PATH in scripts
 ```
 
-### Custom recording settings
+## ✅ What Works
 
-Edit `dictate.sh` to adjust:
-- Sample rate (default: 16000 Hz)
-- Silence threshold (default: 1%)
-- Silence duration (default: 1 second)
+- **Toggle mode** - Recording with GNOME notifications
+- **Push-to-talk** - Hold Alt+/ to record
+- **Auto-typing** - Types transcribed text (ydotool/xdotool)
+- **Clipboard fallback** - Copies if typing unavailable
+- **Wayland native** - Full Wayland/GNOME support
+- **PulseAudio** - Reliable audio capture
 
-## Privacy & Security
+## 🔧 Troubleshooting
 
-- **100% offline**: No data sent to any servers
-- **Local processing**: All transcription happens on your machine
-- **No tracking**: Completely private, no telemetry
-- **Temporary files**: Audio recordings auto-deleted after transcription
+### No text appearing?
+```bash
+# Install typing tools
+sudo dnf install ydotool
+sudo systemctl enable --now ydotool  # For Wayland
 
-## Credits
+# Or use clipboard fallback
+sudo dnf install wl-clipboard
+```
 
-- [Whisper](https://github.com/openai/whisper) by OpenAI (model)
-- [whisper.cpp](https://github.com/ggerganov/whisper.cpp) by Georgi Gerganov (C++ implementation)
-- Sox audio toolkit for recording
+### Recording not working?
+```bash
+# Test microphone
+parecord test.wav  # Ctrl+C to stop
+paplay test.wav    # Should hear your voice
 
-## License
+# Check volume
+pavucontrol  # GUI mixer
+```
 
-This project uses open-source components:
-- Whisper model: MIT License
-- whisper.cpp: MIT License
+### Push-to-talk not detecting keys?
+```bash
+# Must run with sudo
+sudo python3 scripts/push-to-talk.py
+
+# Check python-evdev
+python3 -c "import evdev"  # Should not error
+```
+
+### Transcription inaccurate?
+- Speak clearly, normal pace
+- Reduce background noise
+- Consider `small.en` model for better accuracy
+
+## 📊 Performance
+
+- **Model**: base.en (142MB, English-optimized)
+- **Speed**: ~3-5 seconds for 10 seconds of audio
+- **RAM**: ~1-2GB during transcription
+- **CPU**: 4 cores recommended (works on i7-4710HQ)
+
+## 🔒 Privacy & Security
+
+- **100% Offline**: No internet required after setup
+- **Local Processing**: All transcription on your machine
+- **No Telemetry**: Zero tracking or analytics
+- **Auto-cleanup**: Temporary recordings deleted after use
+
+## 💡 Tips
+
+1. **For meetings**: Use toggle mode with `Super+V`
+2. **For coding**: Push-to-talk with `Alt+/`
+3. **For long text**: Manual mode with `dictate -m`
+4. **Quick test**: `dictate -p` to print only
+
+## 🐛 Known Issues
+
+- Push-to-talk requires sudo (evdev limitation)
+- GNOME on Wayland blocks global hotkeys (use toggle mode)
+- First transcription may be slower (model loading)
+
+## 📚 Documentation
+
+- [Setup Shortcuts Guide](SETUP_SHORTCUTS.md) - Detailed setup instructions
+- [Whisper.cpp](https://github.com/ggerganov/whisper.cpp) - Transcription engine
+- [OpenAI Whisper](https://github.com/openai/whisper) - Original model
+
+## 🙏 Credits
+
+- **Whisper** by OpenAI - Speech recognition model
+- **whisper.cpp** by Georgi Gerganov - C++ implementation  
+- **PulseAudio** - Audio capture
+- Built with **Claude Code** for improved developer experience
+
+## 📄 License
+
+MIT License - Use freely, modify as needed.
 
 ---
 
-Created with Claude Code for improved terminal workflow and accessibility.
+*Voice control your terminal. Type with your voice. Stay in flow.*
